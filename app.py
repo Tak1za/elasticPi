@@ -82,7 +82,8 @@ class Document(Resource):
         parser.add_argument("data")
         args = parser.parse_args()
         body = str(args["data"]).replace("'", '"')
-        connection.request("PUT", index + "/" + type + "/" + id, body, headers)
+        url = index + "/" + type + "/" + id
+        connection.request("PUT", url, body, headers)
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -283,6 +284,13 @@ class Aggregation(Resource):
         connection.close()
 
 class CreateIndex(Resource):
+    def get(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("GET", index)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+    
     def put(self, index):
         connection = http.client.HTTPConnection("10.8.173.181", 80)
         headers = {'Content-type': 'application/json'}
@@ -294,6 +302,73 @@ class CreateIndex(Resource):
             connection.request("PUT", index, body, headers)
         else:
             connection.request("PUT", index)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+    def delete(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("DELETE", index)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class OpenIndex(Resource):
+    def post(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("POST", index + "/_open")
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class CloseIndex(Resource):
+    def post(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("POST", index + "/_close")
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class ShrinkIndex(Resource):
+    def post(self, sourceIndex, targetIndex):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        parser = reqparse.RequestParser()
+        parser.add_argument("data")
+        parser.add_argument("copy_settings")
+        args = parser.parse_args()
+        if(args["copy_settings"] != None):
+            url = sourceIndex + "/_shrink/" + targetIndex + "?copy_settings=" + args["copy_settings"]
+        else:
+            url = sourceIndex + "/_shrink/" + targetIndex
+        
+        if(args["data"] != None):
+            body = str(args["data"]).replace("'", '"')
+            headers = {'Content-type': 'application/json'}
+            connection.request("POST", url, body, headers)
+        else:
+            connection.request("POST", url)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class SplitIndex(Resource):
+    def post(self, sourceIndex, targetIndex):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        parser = reqparse.RequestParser()
+        parser.add_argument("data")
+        parser.add_argument("copy_settings")
+        args = parser.parse_args()
+        if(args["copy_settings"] != None):
+            url = sourceIndex + "/_split/" + targetIndex + "?copy_settings=" + args["copy_settings"]
+        else:
+            url = sourceIndex + "/_split/" + targetIndex
+        
+        if(args["data"] != None):
+            body = str(args["data"]).replace("'", '"')
+            headers = {'Content-type': 'application/json'}
+            connection.request("POST", url, body, headers)
+        else:
+            connection.request("POST", url)
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -521,7 +596,11 @@ api.add_resource(UpdateByQuery, "/<string:index>/update_by_query")
 api.add_resource(Settings, "/<string:index>/settings")
 api.add_resource(Mapping, "/<string:index>/mapping")
 api.add_resource(Alias, "/<string:index>/alias")
+api.add_resource(OpenIndex, "/<string:index>/open")
+api.add_resource(CloseIndex, "/<string:index>/close")
 api.add_resource(CreateIndex, "/<string:index>")
+api.add_resource(ShrinkIndex, "/<string:sourceIndex>/shrink/<string:targetIndex>")
+api.add_resource(SplitIndex, "/<string:sourceIndex>/split/<string:targetIndex>")
 api.add_resource(Source, "/<string:index>/<string:type>/<string:id>/source")
 api.add_resource(Bulk, "/bulk")
 api.add_resource(Reindex, "/reindex")
