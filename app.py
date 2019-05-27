@@ -445,6 +445,32 @@ class Settings(Resource):
         return json.loads(response.read().decode())
         connection.close()
 
+class Analyze(Resource):
+    def get(self):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        headers = {'Content-type': 'application/json'}
+        parser = reqparse.RequestParser()
+        parser.add_argument("data")
+        args = parser.parse_args()
+        body = str(args["data"]).replace("'", '"')
+        connection.request("GET", "_analyze", body, headers)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class IndexAnalyze(Resource):
+    def get(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        headers = {'Content-type': 'application/json'}
+        parser = reqparse.RequestParser()
+        parser.add_argument("data")
+        args = parser.parse_args()
+        body = str(args["data"]).replace("'", '"')
+        connection.request("GET", index + "/_analyze", body, headers)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
 class Documents(Resource):
     def get(self, index):
         es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
@@ -620,6 +646,8 @@ api.add_resource(FieldMapping, "/<string:index>/mapping/<string:type>/field/<str
 api.add_resource(AllMappings, "/mapping", "/mappings")
 api.add_resource(Aliases, "/aliases", "/alias")
 api.add_resource(Alias, "/<string:index>/alias")
+api.add_resource(Analyze, "/analyze")
+api.add_resource(IndexAnalyze, "<string:index>/analyze")
 api.add_resource(Bulk, "/bulk")
 api.add_resource(Reindex, "/reindex")
 api.add_resource(IndexHealth, "/<string:index>/health")
