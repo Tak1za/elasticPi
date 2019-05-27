@@ -373,20 +373,6 @@ class SplitIndex(Resource):
         return json.loads(response.read().decode())
         connection.close()
 
-class Documents(Resource):
-    def get(self, index):
-        es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
-        res = es.search(index=index)
-        return res
-
-
-class Settings(Resource):
-    def get(self, index):
-        es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
-        res = es.indices.get_settings(index=index)
-        return res
-
-
 class Mapping(Resource):
     def get(self, index):
         connection = http.client.HTTPConnection("10.8.173.181", 80)
@@ -413,11 +399,8 @@ class FieldMapping(Resource):
 
 class Alias(Resource):
     def get(self, index):
-        # es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
-        # res = es.indices.get_alias(index=index)
-        # return res
         connection = http.client.HTTPConnection("10.8.173.181", 80)
-        connection.request("GET", "/_alias/" + index)
+        connection.request("GET", index + "/_alias/")
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -425,7 +408,7 @@ class Alias(Resource):
 class Aliases(Resource):
     def get(self):
         connection = http.client.HTTPConnection("10.8.173.181", 80)
-        connection.request("GET", "/_aliases")
+        connection.request("GET", "/_alias")
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -441,6 +424,32 @@ class Aliases(Resource):
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
+
+class Settings(Resource):
+    def put(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        headers = {'Content-type': 'application/json'}
+        parser = reqparse.RequestParser()
+        parser.add_argument("data")
+        args = parser.parse_args()
+        body = str(args["data"]).replace("'", '"')
+        connection.request("PUT", index + "/_settings", body, headers)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+    def get(self, index):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("GET", index + "/_settings")
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class Documents(Resource):
+    def get(self, index):
+        es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
+        res = es.search(index=index)
+        return res
 
 class AllAlias(Resource):
     def get(self):
@@ -596,29 +605,29 @@ class ClusterSettings(Resource):
 
 
 api.add_resource(Document, "/<string:index>/<string:type>/<string:id>")
+api.add_resource(Source, "/<string:index>/<string:type>/<string:id>/source")
 api.add_resource(Documents, "/<string:index>/docs")
 api.add_resource(DeleteByQuery, "/<string:index>/delete_by_query")
 api.add_resource(UpdateByQuery, "/<string:index>/update_by_query")
 api.add_resource(Settings, "/<string:index>/settings")
-api.add_resource(Mapping, "/<string:index>/mapping", "/<string:index>/mappings")
-api.add_resource(FieldMapping, "/<string:index>/mapping/<string:type>/field/<string:fieldName>", "/<string:index>/mappings/<string:type>/field/<string:fieldName>")
-api.add_resource(Alias, "/<string:index>/alias")
 api.add_resource(OpenIndex, "/<string:index>/open")
 api.add_resource(CloseIndex, "/<string:index>/close")
 api.add_resource(CreateIndex, "/<string:index>")
 api.add_resource(ShrinkIndex, "/<string:sourceIndex>/shrink/<string:targetIndex>")
 api.add_resource(SplitIndex, "/<string:sourceIndex>/split/<string:targetIndex>")
-api.add_resource(Source, "/<string:index>/<string:type>/<string:id>/source")
+api.add_resource(Mapping, "/<string:index>/mapping", "/<string:index>/mappings")
+api.add_resource(FieldMapping, "/<string:index>/mapping/<string:type>/field/<string:fieldName>", "/<string:index>/mappings/<string:type>/field/<string:fieldName>")
+api.add_resource(AllMappings, "/mapping", "/mappings")
+api.add_resource(Aliases, "/aliases", "/alias")
+api.add_resource(Alias, "/<string:index>/alias")
 api.add_resource(Bulk, "/bulk")
 api.add_resource(Reindex, "/reindex")
-api.add_resource(Aliases, "/aliases")
 api.add_resource(IndexHealth, "/<string:index>/health")
 api.add_resource(Search, "/<string:index>/search")
 api.add_resource(Count, "/<string:index>/count")
 api.add_resource(Aggregation, "/<string:index>/aggs")
 api.add_resource(Create, "/<string:index>/create/<string:id>")
 api.add_resource(Delete, "/<string:index>/delete/<string:id>")
-api.add_resource(AllMappings, "/mapping", "/mappings")
 api.add_resource(ClusterStats, "/cluster/stats")
 api.add_resource(ClusterAllocationExplain, "/cluster/allocation/explain")
 api.add_resource(ClusterSettings, "/cluster/settings")
