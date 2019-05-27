@@ -389,18 +389,24 @@ class Settings(Resource):
 
 class Mapping(Resource):
     def get(self, index):
-        es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
-        res = es.indices.get_mapping(index=index)
-        return res
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("GET", index + "/_mapping")
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
 
-
-class Mappings(Resource):
+class AllMappings(Resource):
     def get(self):
-        # es = Elasticsearch([{'host': '10.8.173.181', 'port': 80}])
-        # res = es.indices.get_mapping()
-        # return res
         connection = http.client.HTTPConnection("10.8.173.181", 80)
         connection.request("GET", "/_mapping")
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
+
+class FieldMapping(Resource):
+    def get(self, index, type, fieldName):
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        connection.request("GET", index + "/_mapping/" + type + "/field/" + fieldName)
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -594,7 +600,8 @@ api.add_resource(Documents, "/<string:index>/docs")
 api.add_resource(DeleteByQuery, "/<string:index>/delete_by_query")
 api.add_resource(UpdateByQuery, "/<string:index>/update_by_query")
 api.add_resource(Settings, "/<string:index>/settings")
-api.add_resource(Mapping, "/<string:index>/mapping")
+api.add_resource(Mapping, "/<string:index>/mapping", "/<string:index>/mappings")
+api.add_resource(FieldMapping, "/<string:index>/mapping/<string:type>/field/<string:fieldName>", "/<string:index>/mappings/<string:type>/field/<string:fieldName>")
 api.add_resource(Alias, "/<string:index>/alias")
 api.add_resource(OpenIndex, "/<string:index>/open")
 api.add_resource(CloseIndex, "/<string:index>/close")
@@ -611,7 +618,7 @@ api.add_resource(Count, "/<string:index>/count")
 api.add_resource(Aggregation, "/<string:index>/aggs")
 api.add_resource(Create, "/<string:index>/create/<string:id>")
 api.add_resource(Delete, "/<string:index>/delete/<string:id>")
-api.add_resource(Mappings, "/mapping")
+api.add_resource(AllMappings, "/mapping", "/mappings")
 api.add_resource(ClusterStats, "/cluster/stats")
 api.add_resource(ClusterAllocationExplain, "/cluster/allocation/explain")
 api.add_resource(ClusterSettings, "/cluster/settings")
