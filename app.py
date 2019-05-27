@@ -194,77 +194,108 @@ class Reindex(Resource):
 
 class Search(Resource):
     def get(self, index):
-        params = []
         connection = http.client.HTTPConnection("10.8.173.181", 80)        
         parser = reqparse.RequestParser()
-        parser.add_argument("data")
-        parser.add_argument("q")
-        parser.add_argument("df")
-        parser.add_argument("analyzer")
-        parser.add_argument("analyze_wildcard")
-        parser.add_argument("batched_reduce_size")
-        parser.add_argument("default_operator")
-        parser.add_argument("lenient")
-        parser.add_argument("explain")
-        parser.add_argument("_source")
-        parser.add_argument("stored_fields")
-        parser.add_argument("sort")
-        parser.add_argument("track_scores")
-        parser.add_argument("track_total_hits")
-        parser.add_argument("timeout")
-        parser.add_argument("terminate_after")
-        parser.add_argument("from")
-        parser.add_argument("size")
         parser.add_argument("search_type")
-        parser.add_argument("allow_partial_search_results")
+        parser.add_argument("field")
+        parser.add_argument("value")
+        parser.add_argument("fields", type=list, location='json')
+        parser.add_argument("values", type=list, location='json')
+        parser.add_argument("range_params", type=dict, location='json') 
+        parser.add_argument("fuzzy_params", type=dict, location='json')
+        parser.add_argument("match_type")
+        parser.add_argument("common_cutoff")
         args = parser.parse_args()
         headers = {'Content-type': 'application/json'}
-        if (args["data"] != None):
-            body = str(args["data"]).replace("'", '"')
-        if (args["q"] != None):
-            params.append("q=" + args["q"])
-        if (args["df"] != None):
-            params.append("df=" +  args["df"])
-        if (args["analyzer"] != None):
-            params.append("analyzer=" + args["analyzer"])
-        if (args["analyze_wildcard"] != None):
-            params.append("analyze_wildcard=" + args["analyze_wildcard"])
-        if (args["batched_reduce_size"] != None):
-            params.append("batched_reduce_size=" +  args["batched_reduce_size"])
-        if (args["default_operator"] != None):
-            params.append("default_operator=" + args["default_operator"])
-        if (args["lenient"] != None):
-            params.append("lenient=" + args["lenient"])
-        if (args["explain"] != None):
-            params.append("explain=" +  args["explain"])
-        if (args["_source"] != None):
-            params.append("_source=" + args["_source"])
-        if (args["stored_fields"] != None):
-            params.append("stored_fields=" +  args["stored_fields"])
-        if (args["sort"] != None):
-            params.append("sort=" + args["sort"])
-        if (args["track_scores"] != None):
-            params.append("track_scores=" + args["track_scores"])
-        if (args["track_total_hits"] != None):
-            params.append("track_total_hits=" +  args["track_total_hits"])
-        if (args["timeout"] != None):
-            params.append("timeout=" + args["timeout"])
-        if (args["terminate_after"] != None):
-            params.append("terminate_after=" +  args["terminate_after"])
-        if (args["from"] != None):
-            params.append("from=" + args["from"])
-        if (args["size"] != None):
-            params.append("size=" + args["size"])
-        if (args["search_type"] != None):
-            params.append("search_type=" +  args["search_type"])
-        if (args["allow_partial_search_results"] != None):
-            params.append("allow_partial_search_results=" + args["allow_partial_search_results"])
-        parameters = "&".join(params)
-        url = index + "/_search" + "?" + parameters
-        if(args["data"] != None):
-            connection.request("GET", url, body, headers)
-        else:
-            connection.request("GET", url)
+        if(args["search_type"] == "match" or args["search_type"] == "match_phrase" or args["search_type"] == "match_phrase_prefix" or args["search_type"] == "term" or args["search_type"] == "prefix" or args["search_type"] == "wildcard" or args["search_type"] == "regexp"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        args["field"]: args["value"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "multi_match"):
+            if(args["match_type"] == None):
+                query = {
+                    "query":{
+                        args["search_type"]:{
+                            "fields": args["fields"],
+                            "query": args["value"]
+                        }
+                    }
+                }
+            else:
+                query = {
+                    "query":{
+                        args["search_type"]:{
+                            "fields": args["fields"],
+                            "query": args["value"],
+                            "type": args["match_type"]
+                        }
+                    }
+                }
+        elif(args["search_type"] == "common"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        "query": args["value"],
+                        "cutoff_frequency": args["common_cutoff"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "query_string"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        "default_field": args["field"],
+                        "query": args["value"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "terms"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        args["field"]: args["values"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "range"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        args["field"]: args["range_params"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "exists"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        "field": args["field"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "fuzzy"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        args["field"]: args["fuzzy_params"]
+                    }
+                }
+            }
+        elif(args["search_type"] == "ids"):
+            query = {
+                "query":{
+                    args["search_type"]:{
+                        "values": args["values"]
+                    }
+                }
+            }
+        print(query)
+        body = str(query).replace("'", '"')
+        connection.request("GET", index + "/_search", body, headers)        
         response = connection.getresponse()
         return json.loads(response.read().decode())
         connection.close()
@@ -647,7 +678,7 @@ api.add_resource(AllMappings, "/mapping", "/mappings")
 api.add_resource(Aliases, "/aliases", "/alias")
 api.add_resource(Alias, "/<string:index>/alias")
 api.add_resource(Analyze, "/analyze")
-api.add_resource(IndexAnalyze, "<string:index>/analyze")
+api.add_resource(IndexAnalyze, "/<string:index>/analyze")
 api.add_resource(Bulk, "/bulk")
 api.add_resource(Reindex, "/reindex")
 api.add_resource(IndexHealth, "/<string:index>/health")
