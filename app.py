@@ -84,7 +84,110 @@ def singleAggregationData(elasticData, firstKey):
         data.update(elasticData["aggregations"])
     return data
 
+def doubleAggregationData(elasticData, firstKey, secondKey):
+    if(firstKey != "occupancyValue"):
+        if(firstKey == "captureTime"):
+            parent = secondKey + "_categories"
+            subparent = firstKey + "_categories"
+            data = {
+                parent: []
+            }
+            listOuter = recursiveFinder(elasticData)
+            for item in listOuter :
+                print(item)
+                innerData = {
 
+                }
+                item[secondKey] = item.pop("key")
+                listInner = recursiveFinder(item)
+                innerData.update({secondKey: item[secondKey]})
+                innerData.update({"doc_count": item['doc_count']})
+                innerData.update({subparent: []})
+                for innerItem in listInner:
+                    if "from_as_string" in innerItem:
+                        ## date_range type
+                        innerItem.pop("key")
+                        innerItem.pop("from")
+                        innerItem.pop("to")
+                        start = innerItem["from_as_string"]
+                        end = innerItem["to_as_string"]
+                        innerItem.pop("from_as_string")
+                        innerItem.pop("to_as_string")
+                        innerItem["from"] = inverseDateConvertor(start)
+                        innerItem["to"] = inverseDateConvertor(end)
+                        innerData[subparent].append(innerItem)
+                    else:
+                        ## date_histogram type
+                        innerItem.pop("key")
+                        innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                        innerItem.pop("key_as_string")
+                        innerData[subparent].append(innerItem)
+                data[parent].append(innerData)
+        elif(secondKey != "occupancyValue"):
+            parent = secondKey + "_categories"
+            subparent = firstKey + "_categories"
+            data = {
+                parent: []
+            }
+            listOuter = recursiveFinder(elasticData)
+            if(secondKey != "captureTime"):
+                ## organizationId or sensorId or systemGuid
+                for item in listOuter:
+                    innerData = {
+                    }
+                    item[secondKey] = item.pop("key")
+                    listInner = recursiveFinder(item)
+                    innerData.update({secondKey: item[secondKey]})
+                    innerData.update({"doc_count": item['doc_count']})
+                    innerData.update({subparent: []})
+                    for innerItem in listInner:
+                        innerItem[firstKey] = innerItem.pop("key")
+                        innerData[subparent].append(innerItem)
+                    data[parent].append(innerData)
+            else:
+                ## captureTime
+                for item in listOuter:
+                    innerData = {
+                    }
+                    if("from_as_string" in item):
+                        ## data_range type
+                        print(item)
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        listInner = recursiveFinder(item)
+                        innerData.update({"doc_count": item["doc_count"]})
+                        innerData.update({"from": item["from"]})
+                        innerData.update({"to": item["to"]})
+                        innerData.update({subparent: []})
+                        for innerItem in listInner:
+                            print(innerItem)
+                            innerItem[firstKey] = innerItem.pop("key")
+                            innerData[subparent].append(innerItem)
+                        data[parent].append(innerData)
+                    else:
+                        ## date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        listInner = recursiveFinder(item)
+                        innerData.update({"doc_count": item["doc_count"]})
+                        innerData.update({"timestamp": item["timestamp"]})
+                        innerData.update({subparent: []})
+                        for innerItem in listInner:
+                            innerItem[firstKey] = innerItem.pop("key")
+                            innerData[subparent].append(innerItem)         
+                        data[parent].append(innerData)
+        else:
+            data = {}
+            data.update(elasticData["aggregations"])
+    return data
 ##[yyyyMMdd'T'HHmmssZ]
 
 #Aggregation Logic
@@ -378,7 +481,7 @@ class DoubleAggregation(Resource):
         # print(body)
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return singleAggregationData(json.loads(response.read().decode()), second)
+        return doubleAggregationData(json.loads(response.read().decode()), first, second)
         # return json.loads(response.read().decode())
         connection.close()
 
