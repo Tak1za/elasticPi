@@ -13,6 +13,81 @@ api = Api(app)
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
 
+def dateConvertor(start, end):
+    list = []
+    startTimestamp = start.split('-')
+    startDate = startTimestamp[0].split('/')
+    startTime = startTimestamp[1].split(':')
+    beginTimestamp = "".join(startDate[::-1]) + "T" + "".join(startTime) + "+0000"
+    list.append(beginTimestamp)
+    endTimestamp = end.split('-')
+    endDate = endTimestamp[0].split('/')
+    endTime = endTimestamp[1].split(':')
+    endingTimestamp = "".join(endDate[::-1]) + "T" + "".join(endTime) + "+0000"
+    list.append(endingTimestamp)
+    return list
+
+def inverseDateConvertor(start):
+    startList = start.split('T')
+    newStartDate = startList[0][6:8] + '/' + startList[0][4:6] + '/' + startList[0][:4]
+    newStartTime = startList[1][:2] + ':' + startList[1][2:4] + ':' + startList[1][4:6]
+    startList = [newStartDate, newStartTime]
+    startTimestamp = '-'.join(startList)
+    return startTimestamp
+
+def recursiveFinder(data):
+    if "buckets" in data:
+        return data["buckets"]
+    for k,v in data.items():
+        if(isinstance(v, dict)):
+            item = recursiveFinder(v)
+            if item is not None:
+                return item
+
+def singleAggregationData(elasticData, firstKey): 
+    if (firstKey != "occupancyValue"):
+        ## Anything but occupancy value
+        parent = firstKey + "_categories"
+        data = {
+            parent: []
+        }
+        list = recursiveFinder(elasticData)
+        if(firstKey != "captureTime"):
+            ## organizationId or sensorId or systemGuid
+            for item in list:
+                if "key" in item:
+                    item[firstKey] = item.pop("key")
+                    data[parent].append(item)
+        else:
+            ## captureTime
+            for item in list:
+                if("from_as_string" in item):
+                    ## date_range type
+                    item.pop("key")
+                    item.pop("from")
+                    item.pop("to")
+                    start = item["from_as_string"]
+                    end = item["to_as_string"]
+                    item.pop("from_as_string")
+                    item.pop("to_as_string")
+                    item["from"] = inverseDateConvertor(start)
+                    item["to"] = inverseDateConvertor(end)
+                    data[parent].append(item)
+                else:
+                    ## date_histogram type
+                    item.pop("key")
+                    item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                    item.pop("key_as_string")
+                    data[parent].append(item)
+    else:
+        data = {}
+        data.update(elasticData["aggregations"])
+    return data
+
+
+##[yyyyMMdd'T'HHmmssZ]
+
+#Aggregation Logic
 class SingleAggregation(Resource):
     def get(self, index, first):
         parser = reqparse.RequestParser()
@@ -20,7 +95,12 @@ class SingleAggregation(Resource):
         parser.add_argument("from")
         parser.add_argument("to")
         parser.add_argument("interval")
+        parser.add_argument("size")
         args = parser.parse_args()
+        if(args["from"] != None and args["to"] != None):
+            dates = dateConvertor(args["from"], args["to"])
+            args["from"] = dates[0]
+            args["to"] = dates[1]
         connection = http.client.HTTPConnection("10.8.173.181", 80)
         headers = {'Content-type': 'application/json'}
         if(first == "organizationId" or first == "sensorId" or first == "systemGuid"):
@@ -80,7 +160,7 @@ class SingleAggregation(Resource):
         body = str(body).replace("'", '"')
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return json.loads(response.read().decode())
+        return singleAggregationData(json.loads(response.read().decode()), first)
         connection.close()
 
 class DoubleAggregation(Resource):
@@ -91,6 +171,10 @@ class DoubleAggregation(Resource):
         parser.add_argument("to")
         parser.add_argument("interval")
         args = parser.parse_args()
+        if(args["from"] != None and args["to"] != None):
+            dates = dateConvertor(args["from"], args["to"])
+            args["from"] = dates[0]
+            args["to"] = dates[1]
         if(args["type"] != None):
             types = args["type"].split(',')
             # print(types)
@@ -294,7 +378,8 @@ class DoubleAggregation(Resource):
         # print(body)
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return json.loads(response.read().decode())
+        return singleAggregationData(json.loads(response.read().decode()), second)
+        # return json.loads(response.read().decode())
         connection.close()
 
 class TripleAggregation(Resource):
@@ -305,6 +390,10 @@ class TripleAggregation(Resource):
         parser.add_argument("to")
         parser.add_argument("interval")
         args = parser.parse_args()
+        if(args["from"] != None and args["to"] != None):
+            dates = dateConvertor(args["from"], args["to"])
+            args["from"] = dates[0]
+            args["to"] = dates[1]
         if(args["type"] != None):
             types = args["type"].split(',')
             # print(types)
@@ -618,9 +707,9 @@ class TripleAggregation(Resource):
                                                 "field": second
                                             },
                                             "aggs":{
-                                                third:{
+                                                first:{
                                                     types[0]:{
-                                                        "field": third
+                                                        "field": first
                                                     }
                                                 }
                                             }
@@ -1037,6 +1126,72 @@ class TripleAggregation(Resource):
         return json.loads(response.read().decode())
         connection.close()
 
+#Search Logic
+class Search(Resource):
+    def get(self, index, field, value):
+        connection = http.client.HTTPConnection('10.8.173.181', 80)
+        parser = reqparse.RequestParser()
+        parser.add_argument("size")
+        parser.add_argument("type")
+        parser.add_argument("from")
+        parser.add_argument("to")
+        parser.add_argument("interval")
+        parser.add_argument("count")
+        args = parser.parse_args()
+        connection = http.client.HTTPConnection("10.8.173.181", 80)
+        headers = {'Content-type': 'application/json'}
+        queries = value.split(',')
+        if(args["size"] != None):
+            args["size"] = int(args["size"])
+        if(args["type"] == "term" or args["type"] == "match" or args["type"] == "prefix"):
+            if(args["size"] != None and args["size"] >= 0):
+                body = {
+                    "size": args["size"],
+                    "query":{
+                        args["type"]: {
+                            field: value
+                        }
+                    }
+                }
+            else:
+                body = {
+                    "query":{
+                        args["type"]: {
+                            field: value
+                        }
+                    }
+                }
+        elif(args["type"] == "terms"):
+            if(args["size"] != None and args["size"] >= 0):
+                body = {
+                    "size": args["size"],
+                    "query":{
+                        args["type"]: {
+                            field: queries
+                        }
+                    }
+                }
+            else:
+                body = {
+                    "query":{
+                        args["type"]: {
+                            field: queries
+                        }
+                    }
+                }
+        elif(args["type"] == "exists"):
+            body = {
+                "query":{
+                    args["type"]: {
+                        field: value
+                    }
+                }
+            }
+        body = str(body).replace("'", '"')
+        connection.request("GET", index + "/_search", body, headers)
+        response = connection.getresponse()
+        return json.loads(response.read().decode())
+        connection.close()
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
@@ -1044,9 +1199,13 @@ class TripleAggregation(Resource):
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
 
+#Aggregation Endpoints
 api.add_resource(SingleAggregation, "/<string:index>/aggs/<string:first>")
 api.add_resource(DoubleAggregation, "/<string:index>/aggs/<string:first>/<string:second>")
 api.add_resource(TripleAggregation, "/<string:index>/aggs/<string:first>/<string:second>/<string:third>")
 
-if __name__ == '__main__':
+#Search Endpoints
+api.add_resource(Search, "/<string:index>/search/<string:field>/<string:value>")
+
+if __name__ == "__main__":
     app.run()
