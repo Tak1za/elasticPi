@@ -36,8 +36,6 @@ def inverseDateConvertor(start):
     startTimestamp = '-'.join(startList)
     return startTimestamp
 
-itemsList = []
-
 def recursiveFinder(data, key):
     if key in data:
         return data[key]
@@ -46,18 +44,6 @@ def recursiveFinder(data, key):
             item = recursiveFinder(v, key)
             if item is not None:
                 return item
-
-def newRecursiveFinder(data, key):
-    for k,v in data.items():
-        if k == key:
-            yield v
-        elif isinstance(v, dict):
-            for result in newRecursiveFinder(v, key):
-                yield result
-        elif isinstance(v, list):
-            for d in v:
-                for result in newRecursiveFinder(v, key):
-                    yield result
 
 # Filtering returned body structure
 
