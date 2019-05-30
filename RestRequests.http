@@ -26,6 +26,10 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue
 
 ### double aggregation ###
 
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/organizationId?type=avg
+
+###
+
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/sensorId/organizationId
 
 ###
@@ -50,3 +54,120 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/or
 ###
 
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId?type=date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+
+### double aggregation ###
+
+### triple aggregation ###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/organizationId/captureTime?type=date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/organizationId/captureTime?type=date_histogram&interval=month
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/organizationId/occupancyValue?type=avg
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/captureTime/organizationId?type=date_histogram&interval=month
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/captureTime/captureTime?type=date_histogram&interval=month
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/captureTime/captureTime?type=date_range&interval=month&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/systemGuid/sensorId/organizationId
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId/organizationId?type=avg
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId/captureTime?type=avg,date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId/captureTime?type=avg,date_histogram&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId/occupancyValue?type=avg,date_histogram&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/captureTime/organizationId?type=avg,date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/captureTime/organizationId?type=avg,date_histogram&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/captureTime/captureTime?type=avg,date_histogram&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId/systemGuid?type=date_histogram&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId/systemGuid?type=date_range&from=01/09/2018-00:00:00&to=01/02/2018-00:00:00
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId/captureTime?type=date_histogram&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
+
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/captureTime/organizationId?type=date_histogram&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/captureTime/organizationId?type=date_range&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
+
+
+### search ###
+
+GET http://localhost:5000/ss-standardizedsensordata/search/sensorId/7712?type=prefix&size=100
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/search/sensorId/7712?type=match
+
+
+
+
+
+###
+
+
+GET http://10.8.173.181/ss-standardizedsensordata/_search
+content-type: application/json
+
+{
+    "size": 0,
+  "aggs": {
+    "orgs": {
+      "terms": {
+        "field": "organizationId"
+      },
+      "aggs": {
+        "systems": {
+          "terms": {
+            "field": "systemGuid"
+          },
+          "aggs": {
+            "time": {
+              "date_range": {
+                "field": "captureTime",
+                "ranges": [
+                  {
+                    "from": "now-10M/M",
+                    "to": "now"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

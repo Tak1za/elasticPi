@@ -12,6 +12,7 @@ api = Api(app)
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
+#Helper Functions
 
 def dateConvertor(start, end):
     list = []
@@ -35,14 +36,30 @@ def inverseDateConvertor(start):
     startTimestamp = '-'.join(startList)
     return startTimestamp
 
-def recursiveFinder(data):
-    if "buckets" in data:
-        return data["buckets"]
+itemsList = []
+
+def recursiveFinder(data, key):
+    if key in data:
+        return data[key]
     for k,v in data.items():
         if(isinstance(v, dict)):
-            item = recursiveFinder(v)
+            item = recursiveFinder(v, key)
             if item is not None:
                 return item
+
+def newRecursiveFinder(data, key):
+    for k,v in data.items():
+        if k == key:
+            yield v
+        elif isinstance(v, dict):
+            for result in newRecursiveFinder(v, key):
+                yield result
+        elif isinstance(v, list):
+            for d in v:
+                for result in newRecursiveFinder(v, key):
+                    yield result
+
+# Filtering returned body structure
 
 def singleAggregationData(elasticData, firstKey): 
     if (firstKey != "occupancyValue"):
@@ -51,7 +68,7 @@ def singleAggregationData(elasticData, firstKey):
         data = {
             parent: []
         }
-        list = recursiveFinder(elasticData)
+        list = recursiveFinder(elasticData, "buckets")
         if(firstKey != "captureTime"):
             ## organizationId or sensorId or systemGuid
             for item in list:
@@ -92,14 +109,14 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
             data = {
                 parent: []
             }
-            listOuter = recursiveFinder(elasticData)
+            listOuter = recursiveFinder(elasticData, "buckets")
             for item in listOuter :
                 print(item)
                 innerData = {
 
                 }
                 item[secondKey] = item.pop("key")
-                listInner = recursiveFinder(item)
+                listInner = recursiveFinder(item, "buckets")
                 innerData.update({secondKey: item[secondKey]})
                 innerData.update({"doc_count": item['doc_count']})
                 innerData.update({subparent: []})
@@ -129,14 +146,14 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
             data = {
                 parent: []
             }
-            listOuter = recursiveFinder(elasticData)
+            listOuter = recursiveFinder(elasticData, "buckets")
             if(secondKey != "captureTime"):
                 ## organizationId or sensorId or systemGuid
                 for item in listOuter:
                     innerData = {
                     }
                     item[secondKey] = item.pop("key")
-                    listInner = recursiveFinder(item)
+                    listInner = recursiveFinder(item, "buckets")
                     innerData.update({secondKey: item[secondKey]})
                     innerData.update({"doc_count": item['doc_count']})
                     innerData.update({subparent: []})
@@ -151,7 +168,6 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
                     }
                     if("from_as_string" in item):
                         ## data_range type
-                        print(item)
                         item.pop("key")
                         item.pop("from")
                         item.pop("to")
@@ -161,7 +177,7 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
                         item.pop("to_as_string")
                         item["from"] = inverseDateConvertor(start)
                         item["to"] = inverseDateConvertor(end)
-                        listInner = recursiveFinder(item)
+                        listInner = recursiveFinder(item, "buckets")
                         innerData.update({"doc_count": item["doc_count"]})
                         innerData.update({"from": item["from"]})
                         innerData.update({"to": item["to"]})
@@ -176,7 +192,7 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
                         item.pop("key")
                         item["timestamp"] = inverseDateConvertor(item["key_as_string"])
                         item.pop("key_as_string")
-                        listInner = recursiveFinder(item)
+                        listInner = recursiveFinder(item, "buckets")
                         innerData.update({"doc_count": item["doc_count"]})
                         innerData.update({"timestamp": item["timestamp"]})
                         innerData.update({subparent: []})
@@ -188,7 +204,644 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
             data = {}
             data.update(elasticData["aggregations"])
     return data
-##[yyyyMMdd'T'HHmmssZ]
+
+def tripleAggregationData(elasticData, first, second, third):
+    if(first == "organizationId" or first == "sensorId" or first == "systemGuid"):
+        if(second == "organizationId" or second == "sensorId" or second == "systemGuid"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        middleItem[second] = middleItem.pop("key")
+                        middleData.update({second: middleItem[second]})
+                        middleData.update({'doc_count': middleItem["doc_count"]})
+                        middleData.update({innerparent: []})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            innerItem[first] = innerItem.pop("key")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if ("from_as_string" in item):
+                        ## date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                        for middleItem in listMiddle:
+                            middleData = {}
+                            middleItem[second] = middleItem.pop("key")
+                            middleData.update({second: middleItem[second]})
+                            middleData.update({'doc_count': middleItem["doc_count"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                            for innerItem in listInner:
+                                innerItem[first] = innerItem.pop("key")
+                                middleData[innerparent].append(innerItem)
+                            outerData[subparent].append(middleData)
+                        data[parent].append(outerData)
+                    else:
+                        ##date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                        for middleItem in listMiddle:
+                            middleData = {}
+                            middleItem[second] = middleItem.pop("key")
+                            middleData.update({second: middleItem[second]})
+                            middleData.update({'doc_count': middleItem["doc_count"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                            for innerItem in listInner:
+                                innerItem[first] = innerItem.pop("key")
+                                middleData[innerparent].append(innerItem)
+                            outerData[subparent].append(middleData)
+                        data[parent].append(outerData)
+        elif(second == "captureTime"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                            for innerItem in listInner:
+                                innerItem[first] = innerItem.pop("key")
+                                middleData[innerparent].append(innerItem)
+                            outerData[subparent].append(middleData)
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                            for innerItem in listInner:
+                                innerItem[first] = innerItem.pop("key")
+                                middleData[innerparent].append(innerItem)
+                            outerData[subparent].append(middleData)
+                        data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if "from_as_string" in item:
+                        ##date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    else:
+                        #date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                            middleData.update({innerparent: []})
+                            listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            innerItem[first] = innerItem.pop("key")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+    elif(first == "occupancyValue"):
+        if(second == "organizationId" or second == "sensorId" or second == "systemGuid"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        middleItem[second] = middleItem.pop("key")
+                        middleData.update({second: middleItem[second]})
+                        middleData.update({'doc_count': middleItem["doc_count"]})
+                        middleData.update({first: middleItem[first]["value"]})
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if ("from_as_string" in item):
+                        ## date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    else:
+                        ##date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        middleItem[second] = middleItem.pop("key")
+                        middleData.update({second: middleItem[second]})
+                        middleData.update({'doc_count': middleItem["doc_count"]})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        middleData.update({first: middleItem[first]["value"]})
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+        elif(second == "captureTime"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            print(middleItem)
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                        middleData.update({first: middleItem[first]["value"]})
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if ("from_as_string" in item):
+                        ## date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    else:
+                        ##date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                        listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                        middleData.update({first: middleItem[first]["value"]})
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData) 
+    elif(first == "captureTime"):
+        if(second == "organizationId" or second == "sensorId" or second == "systemGuid"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        middleItem[second] = middleItem.pop("key")
+                        middleData.update({second: middleItem[second]})
+                        middleData.update({'doc_count': middleItem["doc_count"]})
+                        middleData.update({innerparent: []})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            if("from_as_string" in innerItem):
+                                ##date_range type
+                                innerItem.pop("key")
+                                innerItem.pop("from")
+                                innerItem.pop("to")
+                                start = innerItem["from_as_string"]
+                                end = innerItem["to_as_string"]
+                                innerItem.pop("from_as_string")
+                                innerItem.pop("to_as_string")
+                                innerItem["from"] = inverseDateConvertor(start)
+                                innerItem["to"] = inverseDateConvertor(end)
+                            else:
+                                ##date_histogram type
+                                innerItem.pop("key")
+                                innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                                innerItem.pop("key_as_string")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if ("from_as_string" in item):
+                        ## date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                    else:
+                        ##date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        middleItem[second] = middleItem.pop("key")
+                        middleData.update({second: middleItem[second]})
+                        middleData.update({'doc_count': middleItem["doc_count"]})
+                        middleData.update({innerparent: []})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            if("from_as_string" in innerItem):
+                                ##date_range type
+                                innerItem.pop("key")
+                                innerItem.pop("from")
+                                innerItem.pop("to")
+                                start = innerItem["from_as_string"]
+                                end = innerItem["to_as_string"]
+                                innerItem.pop("from_as_string")
+                                innerItem.pop("to_as_string")
+                                innerItem["from"] = inverseDateConvertor(start)
+                                innerItem["to"] = inverseDateConvertor(end)
+                            else:
+                                ##date_histogram type
+                                innerItem.pop("key")
+                                innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                                innerItem.pop("key_as_string")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+        elif(second == "captureTime"):
+            if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    item[third] = item.pop("key")
+                    outerData.update({third: item[third]})
+                    outerData.update({'doc_count': item["doc_count"]})
+                    outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                        middleData.update({innerparent: []})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            if("from_as_string" in innerItem):
+                                ##date_range type
+                                innerItem.pop("key")
+                                innerItem.pop("from")
+                                innerItem.pop("to")
+                                start = innerItem["from_as_string"]
+                                end = innerItem["to_as_string"]
+                                innerItem.pop("from_as_string")
+                                innerItem.pop("to_as_string")
+                                innerItem["from"] = inverseDateConvertor(start)
+                                innerItem["to"] = inverseDateConvertor(end)
+                            else:
+                                ##date_histogram type
+                                innerItem.pop("key")
+                                innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                                innerItem.pop("key_as_string")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+            elif(third == "captureTime"):
+                parent = third + "_categories"
+                subparent = second + "_categories"
+                innerparent = first + "_categories"
+                data = {
+                    parent: []
+                }
+                listOuter = recursiveFinder(elasticData, "buckets")
+                for item in listOuter:
+                    outerData = {}
+                    if ("from_as_string" in item):
+                        ## date_range type
+                        item.pop("key")
+                        item.pop("from")
+                        item.pop("to")
+                        start = item["from_as_string"]
+                        end = item["to_as_string"]
+                        item.pop("from_as_string")
+                        item.pop("to_as_string")
+                        item["from"] = inverseDateConvertor(start)
+                        item["to"] = inverseDateConvertor(end)
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"from": item["from"]})
+                        outerData.update({"to": item["to"]})
+                        outerData.update({subparent: []})
+                    else:
+                        ##date_histogram type
+                        item.pop("key")
+                        item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                        item.pop("key_as_string")
+                        outerData.update({"doc_count": item["doc_count"]})
+                        outerData.update({"timestamp": item["timestamp"]})
+                        outerData.update({subparent: []})
+                    listMiddle = recursiveFinder(item, "buckets")
+                    for middleItem in listMiddle:
+                        middleData = {}
+                        if("from_as_string" in middleItem):
+                            ## date_range type
+                            middleItem.pop("key")
+                            middleItem.pop("from")
+                            middleItem.pop("to")
+                            start = middleItem["from_as_string"]
+                            end = middleItem["to_as_string"]
+                            middleItem.pop("from_as_string")
+                            middleItem.pop("to_as_string")
+                            middleItem["from"] = inverseDateConvertor(start)
+                            middleItem["to"] = inverseDateConvertor(end)
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"from": middleItem["from"]})
+                            middleData.update({"to": middleItem["to"]})
+                        else:
+                            ##date_histogram type
+                            middleItem.pop("key")
+                            middleItem["timestamp"] = inverseDateConvertor(middleItem["key_as_string"])
+                            middleItem.pop("key_as_string")
+                            middleData.update({"doc_count": middleItem["doc_count"]})
+                            middleData.update({"timestamp": middleItem["timestamp"]})
+                        middleData.update({innerparent: []})
+                        listInner = recursiveFinder(middleItem, "buckets")
+                        for innerItem in listInner:
+                            if("from_as_string" in innerItem):
+                                ##date_range type
+                                innerItem.pop("key")
+                                innerItem.pop("from")
+                                innerItem.pop("to")
+                                start = innerItem["from_as_string"]
+                                end = innerItem["to_as_string"]
+                                innerItem.pop("from_as_string")
+                                innerItem.pop("to_as_string")
+                                innerItem["from"] = inverseDateConvertor(start)
+                                innerItem["to"] = inverseDateConvertor(end)
+                            else:
+                                ##date_histogram type
+                                innerItem.pop("key")
+                                innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                                innerItem.pop("key_as_string")
+                            middleData[innerparent].append(innerItem)
+                        outerData[subparent].append(middleData)
+                    data[parent].append(outerData)
+    return data
+
+def searchData(elasticData, type):
+    parent = {
+        "result": {
+            "total": "",
+            "data": []
+        }
+    }
+    hitsList = elasticData["hits"]["hits"]
+    parent["result"]["total"] = elasticData["hits"]["total"]
+    for hit in hitsList:
+        hit["_source"]["captureTime"] = inverseDateConvertor(hit["_source"]["captureTime"])
+        parent["result"]["data"].append(hit["_source"])
+    return parent
 
 #Aggregation Logic
 class SingleAggregation(Resource):
@@ -583,9 +1236,9 @@ class TripleAggregation(Resource):
                                                 "field": second
                                             },
                                             "aggs":{
-                                                third:{
+                                                first:{
                                                     "terms":{
-                                                        "field": third
+                                                        "field": first
                                                     }
                                                 }
                                             }
@@ -874,9 +1527,9 @@ class TripleAggregation(Resource):
                                                 ]
                                             },
                                             "aggs":{
-                                                third:{
+                                                first:{
                                                     types[0]:{
-                                                        "field": third
+                                                        "field": first
                                                     }
                                                 }
                                             }
@@ -944,9 +1597,9 @@ class TripleAggregation(Resource):
                                                 ]
                                             },
                                             "aggs":{
-                                                third:{
+                                                first:{
                                                     types[0]:{
-                                                        "field": third
+                                                        "field": first
                                                     }
                                                 }
                                             }
@@ -999,9 +1652,9 @@ class TripleAggregation(Resource):
                                                 "field": second
                                             },
                                             "aggs":{
-                                                third:{
+                                                first:{
                                                     aggType:{
-                                                        "field": third,
+                                                        "field": first,
                                                         "ranges":[
                                                             {
                                                                 "from": args["from"],
@@ -1094,7 +1747,8 @@ class TripleAggregation(Resource):
                 return json.loads(str(error).replace("'", '"'))
             elif(second == "captureTime"):
                 if(third == "organizationId" or third == "sensorId" or third == "systemGuid"):
-                    if(types[1] == "date_histogram"):
+                    aggType = args["type"]
+                    if(aggType == "date_histogram"):
                         body = {
                             "size": 0,
                             "aggs": {
@@ -1104,13 +1758,13 @@ class TripleAggregation(Resource):
                                     },
                                     "aggs":{
                                         second:{
-                                            types[1]:{
+                                            aggType:{
                                                 "field": second,
                                                 "interval": args["interval"]
                                             },
                                             "aggs":{
                                                 first:{
-                                                    types[0]:{
+                                                    "terms":{
                                                         "field": first
                                                     }
                                                 }
@@ -1120,7 +1774,7 @@ class TripleAggregation(Resource):
                                 }
                             }
                         }
-                    elif(types[1] == "date_range"):
+                    elif(aggType == "date_range"):
                         body = {
                             "size": 0,
                             "aggs": {
@@ -1130,7 +1784,7 @@ class TripleAggregation(Resource):
                                     },
                                     "aggs":{
                                         second:{
-                                            types[1]:{
+                                            aggType:{
                                                 "field": second,
                                                 "ranges":[
                                                     {
@@ -1140,9 +1794,9 @@ class TripleAggregation(Resource):
                                                 ]
                                             },
                                             "aggs":{
-                                                third:{
-                                                    types[0]:{
-                                                        "field": third
+                                                first:{
+                                                    "terms":{
+                                                        "field": first
                                                     }
                                                 }
                                             }
@@ -1157,25 +1811,27 @@ class TripleAggregation(Resource):
                     }
                     return json.loads(str(error).replace("'", '"'))
                 elif(third == "captureTime"):
-                    if(types[1] == "date_histogram"):
+                    aggType = args["type"]
+                    if(aggType == "date_histogram"):
                         body = {
                             "size": 0,
                             "aggs": {
                                 third:{
-                                    types[1]:{
+                                    aggType:{
                                         "field": third,
                                         "interval": args["interval"]
                                     },
                                     "aggs":{
                                         second:{
-                                            types[1]:{
+                                            aggType:{
                                                 "field": second,
                                                 "interval": args["interval"]
                                             },
                                             "aggs":{
                                                 first:{
-                                                    types[0]:{
-                                                        "field": first
+                                                    aggType:{
+                                                        "field": first,
+                                                        "interval": args["interval"]
                                                     }
                                                 }
                                             }
@@ -1184,12 +1840,12 @@ class TripleAggregation(Resource):
                                 }
                             }
                         }
-                    elif(types[1] == "date_range"):
+                    elif(aggType == "date_range"):
                         body = {
                             "size": 0,
                             "aggs": {
                                 third:{
-                                    types[1]:{
+                                    aggType:{
                                         "field": third,
                                         "ranges":[
                                             {
@@ -1200,7 +1856,7 @@ class TripleAggregation(Resource):
                                     },
                                     "aggs":{
                                         second:{
-                                            types[1]:{
+                                            aggType:{
                                                 "field": second,
                                                 "ranges":[
                                                     {
@@ -1210,9 +1866,15 @@ class TripleAggregation(Resource):
                                                 ]
                                             },
                                             "aggs":{
-                                                third:{
-                                                    types[0]:{
-                                                        "field": third
+                                                first:{
+                                                    aggType:{
+                                                        "field": second,
+                                                        "ranges":[
+                                                            {
+                                                                "from": args["from"],
+                                                                "to": args["to"]
+                                                            }
+                                                        ]
                                                     }
                                                 }
                                             }
@@ -1226,7 +1888,7 @@ class TripleAggregation(Resource):
         # print(body)
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return json.loads(response.read().decode())
+        return tripleAggregationData(json.loads(response.read().decode()), first, second, third)
         connection.close()
 
 #Search Logic
@@ -1293,7 +1955,7 @@ class Search(Resource):
         body = str(body).replace("'", '"')
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return json.loads(response.read().decode())
+        return searchData(json.loads(response.read().decode()), args["type"])
         connection.close()
 #------------------------------------------------------------------------------------------------------------------------#
 #------------------------------------------------------------------------------------------------------------------------#
