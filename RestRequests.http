@@ -123,6 +123,13 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/ca
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/captureTime/organizationId?type=date_range&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
 
 
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/captureTime/captureTime?type=date_histogram&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
+
+###
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/captureTime/captureTime?type=date_range&from=01/09/2018-00:00:00&to=01/02/2019-00:00:00&interval=month
+
+
 ### search ###
 
 GET http://localhost:5000/ss-standardizedsensordata/search/sensorId/7712?type=prefix&size=100

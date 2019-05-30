@@ -102,45 +102,8 @@ def singleAggregationData(elasticData, firstKey):
     return data
 
 def doubleAggregationData(elasticData, firstKey, secondKey):
-    if(firstKey != "occupancyValue"):
-        if(firstKey == "captureTime"):
-            parent = secondKey + "_categories"
-            subparent = firstKey + "_categories"
-            data = {
-                parent: []
-            }
-            listOuter = recursiveFinder(elasticData, "buckets")
-            for item in listOuter :
-                print(item)
-                innerData = {
-
-                }
-                item[secondKey] = item.pop("key")
-                listInner = recursiveFinder(item, "buckets")
-                innerData.update({secondKey: item[secondKey]})
-                innerData.update({"doc_count": item['doc_count']})
-                innerData.update({subparent: []})
-                for innerItem in listInner:
-                    if "from_as_string" in innerItem:
-                        ## date_range type
-                        innerItem.pop("key")
-                        innerItem.pop("from")
-                        innerItem.pop("to")
-                        start = innerItem["from_as_string"]
-                        end = innerItem["to_as_string"]
-                        innerItem.pop("from_as_string")
-                        innerItem.pop("to_as_string")
-                        innerItem["from"] = inverseDateConvertor(start)
-                        innerItem["to"] = inverseDateConvertor(end)
-                        innerData[subparent].append(innerItem)
-                    else:
-                        ## date_histogram type
-                        innerItem.pop("key")
-                        innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
-                        innerItem.pop("key_as_string")
-                        innerData[subparent].append(innerItem)
-                data[parent].append(innerData)
-        elif(secondKey != "occupancyValue"):
+    if(firstKey != "occupancyValue" and firstKey != "captureTime"):
+        if(secondKey != "occupancyValue"):
             parent = secondKey + "_categories"
             subparent = firstKey + "_categories"
             data = {
@@ -200,9 +163,43 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
                             innerItem[firstKey] = innerItem.pop("key")
                             innerData[subparent].append(innerItem)         
                         data[parent].append(innerData)
-        else:
-            data = {}
-            data.update(elasticData["aggregations"])
+    elif(firstKey == "captureTime"):
+        parent = secondKey + "_categories"
+        subparent = firstKey + "_categories"
+        data = {
+            parent: []
+        }
+        if(secondKey == "organizationId" or secondKey == "systemGuid" or secondKey == "sensorId"):
+            listOuter = recursiveFinder(elasticData, "buckets")
+            for item in listOuter :
+                print(item)
+                innerData = {
+
+                }
+                item[secondKey] = item.pop("key")
+                innerData.update({secondKey: item[secondKey]})
+                innerData.update({"doc_count": item['doc_count']})
+                innerData.update({subparent: []})
+                listInner = recursiveFinder(item, "buckets")
+                for innerItem in listInner:
+                    if "from_as_string" in innerItem:
+                        ## date_range type
+                        innerItem.pop("key")
+                        innerItem.pop("from")
+                        innerItem.pop("to")
+                        start = innerItem["from_as_string"]
+                        end = innerItem["to_as_string"]
+                        innerItem.pop("from_as_string")
+                        innerItem.pop("to_as_string")
+                        innerItem["from"] = inverseDateConvertor(start)
+                        innerItem["to"] = inverseDateConvertor(end)
+                    else:
+                        ## date_histogram type
+                        innerItem.pop("key")
+                        innerItem["timestamp"] = inverseDateConvertor(innerItem["key_as_string"])
+                        innerItem.pop("key_as_string")
+                    innerData[subparent].append(innerItem)
+                data[parent].append(innerData)
     return data
 
 def tripleAggregationData(elasticData, first, second, third):
