@@ -22,15 +22,61 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/sensorId
 
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue?type=avg
 
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/sensorId?value=3337,7502
+
 ### single aggregation ###
 
 ### double aggregation ###
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId?sensorId_value=5913,2664&type=avg
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/organizationId?occupancyValue_value=0
+
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/organizationId?occupancyValue_value=1&organizationId_value=Gol63632843297901
+
+###
 
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/organizationId?type=avg
 
 ###
 
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/systemGuid?type=avg
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/sensorId?type=avg
+
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/organizationId/captureTime?type=date_range&interval=month&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00&organizationId_value=Gol63632843297901,PCT63655935692506
+
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/occupancyValue/captureTime?type=date_range&interval=month&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00&occupancyValue_value=0
+
+###
+
 GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/sensorId/organizationId
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/organizationId/sensorId
+
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/sensorId/systemGuid
 
 ###
 
@@ -49,11 +95,11 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/ca
 
 
 ###
-GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId?type=date_histogram&interval=month
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId?type=date_histogram&interval=month&organizationId_value=Gol63632843297901,PCT63655935692506
 
 ###
 
-GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId?type=date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00
+GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/organizationId?type=date_range&from=01/09/2018-00:00:00&to=01/12/2018-00:00:00&organizationId_value=Gol63632843297901,PCT63655935692506
 
 ### double aggregation ###
 
@@ -68,6 +114,10 @@ GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/organizationId
 ###
 
 GET http://localhost:5000/ss-standardizedsensordata/aggs/sensorId/organizationId/occupancyValue?type=avg
+
+###
+
+GET http://localhost:5000/ss-standardizedsensordata/aggs/organizationId/systemGuid/sensorId
 
 ###
 
@@ -131,20 +181,13 @@ GET http://localhost:5000/ss-standardizedsensordata_16shards/aggs/captureTime/ca
 
 
 ### search ###
-
 GET http://localhost:5000/ss-standardizedsensordata/search/sensorId/7712?type=prefix&size=100
 
 ###
-
 GET http://localhost:5000/ss-standardizedsensordata/search/sensorId/7712?type=match
 
 
-
-
-
 ###
-
-
 GET http://10.8.173.181/ss-standardizedsensordata/_search
 content-type: application/json
 

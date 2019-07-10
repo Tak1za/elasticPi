@@ -87,6 +87,11 @@ def singleAggregationData(elasticData, firstKey):
         data.update(elasticData["aggregations"])
     return data
 
+def singleAggregationFilterData(elasticData, first):
+    data = {}
+    data.update(elasticData["aggregations"])
+    return data
+
 def doubleAggregationData(elasticData, firstKey, secondKey):
     if(firstKey != "occupancyValue" and firstKey != "captureTime"):
         if(secondKey != "occupancyValue"):
@@ -157,6 +162,7 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
         }
         if(secondKey == "organizationId" or secondKey == "systemGuid" or secondKey == "sensorId"):
             listOuter = recursiveFinder(elasticData, "buckets")
+            print(listOuter)
             for item in listOuter :
                 print(item)
                 innerData = {
@@ -186,6 +192,149 @@ def doubleAggregationData(elasticData, firstKey, secondKey):
                         innerItem.pop("key_as_string")
                     innerData[subparent].append(innerItem)
                 data[parent].append(innerData)
+    elif(firstKey == "occupancyValue"):
+        parent = secondKey + "_categories"
+        subparent = firstKey + "_categories"
+        data = {
+            parent: []
+        }
+        listOuter = recursiveFinder(elasticData, "buckets")
+        if(secondKey == "captureTime"):
+            for item in listOuter:
+                innerData = {
+                }
+                if("from_as_string" in item):
+                    ## data_range type
+                    item.pop("key")
+                    item.pop("from")
+                    item.pop("to")
+                    start = item["from_as_string"]
+                    end = item["to_as_string"]
+                    item.pop("from_as_string")
+                    item.pop("to_as_string")
+                    item["from"] = inverseDateConvertor(start)
+                    item["to"] = inverseDateConvertor(end)
+                    innerData.update({"doc_count": item["doc_count"]})
+                    innerData.update({"from": item["from"]})
+                    innerData.update({"to": item["to"]})
+                else:
+                    ## date_histogram type
+                    item.pop("key")
+                    item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                    item.pop("key_as_string")
+                    innerData.update({"doc_count": item["doc_count"]})
+                    innerData.update({"timestamp": item["timestamp"]})
+                innerData.update({firstKey: item[firstKey]["value"]})        
+                data[parent].append(innerData)
+        elif(secondKey == "organizationId" or secondKey == "sensorId" or secondKey == "sysstemGuid"):
+            for item in listOuter:
+                innerData = {}
+                print(item)
+                item[secondKey] = item.pop("key")
+                innerData.update({secondKey: item[secondKey]})
+                innerData.update({"doc_count": item['doc_count']})
+                innerData.update({firstKey: item[firstKey]["value"]})
+                data[parent].append(innerData)
+    return data
+
+def doubleAggregationFilterData(elasticData, firstKey, secondKey):
+    if(firstKey == "occupancyValue" and secondKey == "captureTime"):
+        parent = secondKey + "_categories"
+        subparent = firstKey + "_categories"
+        data = {
+            parent: []
+        }
+        listOuter = recursiveFinder(elasticData, "buckets")
+        if(secondKey == "captureTime"):
+            for item in listOuter:
+                innerData = {
+                }
+                if("from_as_string" in item):
+                    ## data_range type
+                    item.pop("key")
+                    item.pop("from")
+                    item.pop("to")
+                    start = item["from_as_string"]
+                    end = item["to_as_string"]
+                    item.pop("from_as_string")
+                    item.pop("to_as_string")
+                    item["from"] = inverseDateConvertor(start)
+                    item["to"] = inverseDateConvertor(end)
+                    innerData.update({"doc_count": item["doc_count"]})
+                    innerData.update({"from": item["from"]})
+                    innerData.update({"to": item["to"]})
+                else:
+                    ## date_histogram type
+                    item.pop("key")
+                    item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                    item.pop("key_as_string")
+                    innerData.update({"doc_count": item["doc_count"]})
+                    innerData.update({"timestamp": item["timestamp"]})
+                innerData.update({firstKey: item[firstKey]["doc_count"]})        
+                data[parent].append(innerData)
+    elif((firstKey == "organizationId" or firstKey == "sensorId" or firstKey == "systemGuid") and secondKey=="captureTime"):
+        parent = secondKey + "_categories"
+        subparent = firstKey + "_categories"
+        data = {
+            parent: []
+        }
+        listOuter = recursiveFinder(elasticData, "buckets")
+        for item in listOuter:
+            innerData = {
+            }
+            if("from_as_string" in item):
+                ## data_range type
+                item.pop("key")
+                item.pop("from")
+                item.pop("to")
+                start = item["from_as_string"]
+                end = item["to_as_string"]
+                item.pop("from_as_string")
+                item.pop("to_as_string")
+                item["from"] = inverseDateConvertor(start)
+                item["to"] = inverseDateConvertor(end)
+                innerData.update({"doc_count": item["doc_count"]})
+                innerData.update({"from": item["from"]})
+                innerData.update({"to": item["to"]})
+                innerData.update({subparent: []})
+                innerData[subparent].append(item[firstKey])
+                data[parent].append(innerData)
+            else:
+                ## date_histogram type
+                item.pop("key")
+                item["timestamp"] = inverseDateConvertor(item["key_as_string"])
+                item.pop("key_as_string")
+                innerData.update({"doc_count": item["doc_count"]})
+                innerData.update({"timestamp": item["timestamp"]})
+                innerData.update({subparent: []})
+                innerData[subparent].append(item[firstKey])         
+                data[parent].append(innerData)
+    elif(firstKey == "captureTime"):
+        # data = {}
+        # data.update(elasticData["aggregations"])
+        # data[firstKey]["categories"] = data[firstKey].pop("buckets")
+        data = {}
+        data.update(elasticData["aggregations"])
+        data[secondKey][firstKey]["categories"] = data[secondKey][firstKey].pop("buckets")
+        for item in data[secondKey][firstKey]["categories"]:
+            if "key_as_string" in item:
+                ##date_histogram
+                item.pop("key")
+                item.update({"timestamp": inverseDateConvertor(item["key_as_string"])})
+                item.pop("key_as_string")
+            else:
+                ##date_range
+                item.pop("from")
+                item.pop("to")
+                item.update({"from": inverseDateConvertor(item["from_as_string"])})
+                item.update({"to": inverseDateConvertor(item["to_as_string"])})
+                item.pop("from_as_string")
+                item.pop("to_as_string")
+                item.pop("key")
+        return data 
+    else:
+        data = {}
+        data.update(elasticData["aggregations"])
     return data
 
 def tripleAggregationData(elasticData, first, second, third):
@@ -835,13 +984,23 @@ class SingleAggregation(Resource):
         parser.add_argument("to")
         parser.add_argument("interval")
         parser.add_argument("size")
+        parser.add_argument("value")
         args = parser.parse_args()
         if(args["from"] != None and args["to"] != None):
             dates = dateConvertor(args["from"], args["to"])
             args["from"] = dates[0]
             args["to"] = dates[1]
+        if(args["value"] != None):
+            values = args["value"].split(',')
+            print(values)
+            if(len(values) > 1):
+                filterAgg = "terms"
+            else:
+                filterAgg = "term"
         connection = http.client.HTTPConnection("10.8.173.181", 80)
-        headers = {'Content-type': 'application/json'}
+        headers = {
+            'Content-type': 'application/json'
+        }
         if(first == "organizationId" or first == "sensorId" or first == "systemGuid"):
             body = {
                 "size": 0,
@@ -896,10 +1055,32 @@ class SingleAggregation(Resource):
                         }
                     }
                 }
+        if(args["value"] != None):
+            if(args["type"] != None):
+                aggType = args["type"]
+            else:
+                aggType = "terms"
+            body["aggs"][first].pop(aggType)
+            if(filterAgg == "term"):
+                filterAggregation = {
+                    filterAgg: {
+                        first: args["value"]
+                    }
+                }
+            else:
+                filterAggregation = {
+                    filterAgg: {
+                        first: values
+                    }
+                }
+            body["aggs"][first].update({"filter": filterAggregation})
         body = str(body).replace("'", '"')
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return singleAggregationData(json.loads(response.read().decode()), first)
+        if(args["value"] != None):
+            return singleAggregationFilterData(json.loads(response.read().decode()), first)
+        else:
+            return singleAggregationData(json.loads(response.read().decode()), first)
         connection.close()
 
 class DoubleAggregation(Resource):
@@ -909,6 +1090,11 @@ class DoubleAggregation(Resource):
         parser.add_argument("from")
         parser.add_argument("to")
         parser.add_argument("interval")
+        parser.add_argument("occupancyValue_value")
+        parser.add_argument("sensorId_value")
+        parser.add_argument("organizationId_value")
+        parser.add_argument("systemGuid_value")
+        parser.add_argument("captureTime_value")
         args = parser.parse_args()
         if(args["from"] != None and args["to"] != None):
             dates = dateConvertor(args["from"], args["to"])
@@ -938,120 +1124,229 @@ class DoubleAggregation(Resource):
                             }
                         }
                     }
-            elif(second == "occupancyValue"):
+            elif(second == "occupancyValue" and args["occupancyValue_value"] == None):
                 error = {
                     "Error": "Invalid sub-aggregation"
                 }
                 return json.loads(str(error).replace("'", '"'))
             elif(second == "captureTime"):
                 aggType = args["type"]
-                if(aggType == "date_range"):
-                    body = {
-                        "size": 0,
-                        "aggs":{
-                            second:{
-                                aggType:{
-                                    "field": second,
-                                    "ranges":[
-                                        {
-                                            "from": args["from"],
-                                            "to": args["to"]
-                                        }
-                                    ]
-                                },
-                                "aggs":{
-                                    first:{
-                                        "terms":{
-                                            "field": first
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                elif(aggType == "date_histogram"):
-                    body = {
-                        "size": 0,
-                        "aggs":{
-                            second:{
-                                aggType:{
-                                    "field": second,
-                                    "interval": args["interval"]
-                                },
-                                "aggs":{
-                                    first:{
-                                        "terms":{
-                                            "field": first
+                if(args[first+"_value"] == None):
+                    if(aggType == "date_range"):
+                        body = {
+                            "size": 0,
+                            "aggs":{
+                                second:{
+                                    aggType:{
+                                        "field": second,
+                                        "ranges":[
+                                            {
+                                                "from": args["from"],
+                                                "to": args["to"]
+                                            }
+                                        ]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "terms":{
+                                                "field": first
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                    elif(aggType == "date_histogram"):
+                        body = {
+                            "size": 0,
+                            "aggs":{
+                                second:{
+                                    aggType:{
+                                        "field": second,
+                                        "interval": args["interval"]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "terms":{
+                                                "field": first
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                else:
+                    values = args[first + "_value"].split(',')
+                    if(len(values) > 1):
+                        filterAgg = "terms"
+                    else:
+                        filterAgg = "term"
+                        values = values[0]
+                    if(aggType == "date_range"):
+                        body = {
+                            "size": 0,
+                            "aggs":{
+                                second:{
+                                    aggType:{
+                                        "field": second,
+                                        "ranges":[
+                                            {
+                                                "from": args["from"],
+                                                "to": args["to"]
+                                            }
+                                        ]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "filter":{
+                                                filterAgg:{
+                                                    first: values
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    elif(aggType == "date_histogram"):
+                        body = {
+                            "size": 0,
+                            "aggs":{
+                                second:{
+                                    aggType:{
+                                        "field": second,
+                                        "interval": args["interval"]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "filter":{
+                                                filterAgg:{
+                                                    first: values
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
         elif(first == "occupancyValue"):
             if(second == "organizationId" or second == "sensorId" or second == "systemGuid"):
-                aggType = args["type"]
-                body = {
-                    "size": 0,
-                    "aggs":{
-                        second:{
-                            "terms":{
-                                "field": second
-                            },
-                            "aggs":{
-                                first:{
-                                    aggType:{
-                                        "field": first
+                if(args[first+"_value"] == None):
+                    if(args["type"] != None):
+                        aggType = args["type"]
+                    else:
+                        aggType = "term"
+                    body = {
+                        "size": 0,
+                        "aggs":{
+                            second:{
+                                "terms":{
+                                    "field": second
+                                },
+                                "aggs":{
+                                    first:{
+                                        aggType:{
+                                            "field": first
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
             elif(second == "captureTime"):
-                if types[1] == "date_histogram":
-                    body = {
-                        "size": 0,
-                        "aggs": {
-                            second:{
-                                types[1]:{
-                                    "field": second,
-                                    "interval": args["interval"]
-                                },
-                                "aggs":{
-                                    first:{
-                                        types[0]:{
-                                            "field": first
+                if(len(types) == 1):
+                    if types[0] == "date_histogram":
+                        body = {
+                            "size": 0,
+                            "aggs": {
+                                second:{
+                                    types[0]:{
+                                        "field": second,
+                                        "interval": args["interval"]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "filter":{
+                                                "term":{
+                                                    first: args[first+"_value"]
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                elif types[1] == "date_range":
-                    body = {
-                        "size": 0,
-                        "aggs": {
-                            second:{
-                                types[1]:{
-                                    "field": second,
-                                    "ranges":[
-                                        {
-                                            "from": args["from"],
-                                            "to": args["to"]
-                                        }
-                                    ]
-                                },
-                                "aggs":{
-                                    first:{
-                                        types[0]:{
-                                            "field": first
+                    elif types[0] == "date_range":
+                        print(types)
+                        body = {
+                            "size": 0,
+                            "aggs": {
+                                second:{
+                                    types[0]:{
+                                        "field": second,
+                                        "ranges":[
+                                            {
+                                                "from": args["from"],
+                                                "to": args["to"]
+                                            }
+                                        ]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            "filter":{
+                                                "term":{
+                                                    first: args[first+"_value"]
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
+                else:
+                    if types[1] == "date_histogram":
+                        body = {
+                            "size": 0,
+                            "aggs": {
+                                second:{
+                                    types[1]:{
+                                        "field": second,
+                                        "interval": args["interval"]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            types[0]:{
+                                                "field": first
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    elif types[1] == "date_range":
+                        body = {
+                            "size": 0,
+                            "aggs": {
+                                second:{
+                                    types[1]:{
+                                        "field": second,
+                                        "ranges":[
+                                            {
+                                                "from": args["from"],
+                                                "to": args["to"]
+                                            }
+                                        ]
+                                    },
+                                    "aggs":{
+                                        first:{
+                                            types[0]:{
+                                                "field": first
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
             elif(second == "occupancyValue"):
                 error = {
                     "Error": "Invalid sub-aggregation"
@@ -1113,11 +1408,114 @@ class DoubleAggregation(Resource):
                     "Error": "Invalid sub-aggregation"
                 }
                 return json.loads(str(error).replace("'", '"'))
+        if(args[second+"_value"] != None and args[first+"_value"] == None):
+            values = args[second + "_value"].split(',')
+            if(len(values) > 1):
+                filterAgg = "terms"
+            else:
+                filterAgg = "term"
+            if(args["type"] == None):
+                aggType = "terms"
+            else:
+                aggType = args["type"]
+            print(body)
+            secondaryAgg = body["aggs"][second]["aggs"]
+            body["aggs"][second].pop("terms")
+            body["aggs"][second].pop("aggs")
+            if(filterAgg == "term"):
+                filterAggregation = {
+                    filterAgg: {
+                        second: args[second + "_value"]
+                    }
+                }
+            else:
+                filterAggregation = {
+                    filterAgg: {
+                        second: values
+                    }
+                }
+            body["aggs"][second].update({"filter": filterAggregation})
+            body["aggs"][second].update({"aggs": secondaryAgg})
+            print(body)
+        elif(args[second+"_value"]!=None and args[first+"_value"]!=None):
+            valuesSecond = args[second + "_value"].split(',')
+            valuesFirst = args[first + "_value"].split(',')
+            if(len(valuesSecond) > 1):
+                filterAggSecond = "terms"
+            else:
+                filterAggSecond = "term"
+                valuesSecond = valuesSecond[0]
+            if(len(valuesFirst) > 1):
+                filterAggFirst = "terms"
+            else:
+                filterAggFirst = "term"
+                valuesFirst = valuesFirst[0]
+            if(args["type"] == None):
+                aggType = "terms"
+            else:
+                aggType = args["type"]
+            body = {
+                "size": 0,
+                "aggs":{
+                    second:{
+                        "filter":{
+                            filterAggSecond:{
+                                second: valuesSecond
+                            }
+                        },
+                        "aggs":{
+                            first:{
+                                "filter":{
+                                    filterAggFirst:{
+                                        first: valuesFirst
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        elif(args[second+"_value"]==None and args[first+"_value"]!=None):
+            if(second!="captureTime"):
+                values = args[first + "_value"].split(',')
+                if(len(values) > 1):
+                    filterAgg = "terms"
+                else:
+                    filterAgg = "term"
+                    values = values[0]
+                if(args["type"] == None):
+                    aggType = "terms"
+                else:
+                    aggType = args["type"]
+                body = {
+                    "size": 0,
+                    "aggs":{
+                        second:{
+                            aggType:{
+                                "field": second 
+                            },
+                            "aggs":{
+                                first:{
+                                    "filter":{
+                                        filterAgg:{
+                                            first: values
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
         body = str(body).replace("'", '"')
-        # print(body)
+        print(body)
         connection.request("GET", index + "/_search", body, headers)
         response = connection.getresponse()
-        return doubleAggregationData(json.loads(response.read().decode()), first, second)
+        if(args[second + "_value"] != None or args[first + "_value"] != None):
+            print("hit")
+            return doubleAggregationFilterData(json.loads(response.read().decode()), first, second)
+        else:
+            return doubleAggregationData(json.loads(response.read().decode()), first, second)
         # return json.loads(response.read().decode())
         connection.close()
 
@@ -1128,6 +1526,9 @@ class TripleAggregation(Resource):
         parser.add_argument("from")
         parser.add_argument("to")
         parser.add_argument("interval")
+        parser.add_argument("sensorId_value")
+        parser.add_argument("systemGuid_value")
+        parser.add_argument("organizationId_value")
         args = parser.parse_args()
         if(args["from"] != None and args["to"] != None):
             dates = dateConvertor(args["from"], args["to"])
@@ -1866,7 +2267,7 @@ class TripleAggregation(Resource):
                                 }
                             }
                         }
-        
+
         body = str(body).replace("'", '"')
         # print(body)
         connection.request("GET", index + "/_search", body, headers)
